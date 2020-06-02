@@ -5,9 +5,9 @@ import json
 
 producer = kp(bootstrap_servers = 'localhost:9092')
 
-with open('C:/Users/mrupv/bits/spa/Assignment2/paysim1/PS_20174392719_1491204439457_log.csv','rt') as file:
+with open('C:/Users/mrupv/bits/spa/Assignment2/paysim1/train.csv','rt') as file:
     data = list(csv.DictReader(file))
     for row in data:
         print(json.dumps(row))
         producer.send(topic='fraud_log',value=json.dumps(row).encode('utf-8'))
-        time.sleep(1)
+        time.sleep(3)
