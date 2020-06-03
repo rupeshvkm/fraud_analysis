@@ -1,19 +1,18 @@
+from pyspark.ml.classification import LogisticRegressionModel
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import *
+from pyspark.ml import PipelineModel
 from pyspark.sql.types import *
+from pyspark.sql.functions import *
 
+spark = SparkSession.builder.master('local[5]').appName('predictor').getOrCreate()
+model = PipelineModel.load('model/')
 
-spark = SparkSession.builder.master("local[5]").appName("stream_processor").getOrCreate()
-# sc = SparkContext(appName="PythonStreamingKafkaWordCount")
-# ssc = StreamingContext(sc, 10)
-
-linesDF = spark \
+df = spark \
     .readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
-    .option("subscribe", "fraud.logs") \
+    .option("subscribe", "fraud.test.logs") \
     .load()
-    #.option("startingOffsets", "earliest") \
 
 schema = StructType([
     StructField("step", StringType(), True),
@@ -29,17 +28,11 @@ schema = StructType([
     StructField("isFlaggedFraud", StringType(), True)
 ])
 
-rowDF = linesDF.withColumn('value',from_json(linesDF['value'].cast('string'),schema))\
+rowDF = df.withColumn('value',from_json(df['value'].cast('string'),schema)) \
     .select('value.step','value.type','value.amount','value.nameOrig','value.oldbalanceOrg','value.newbalanceOrig','value.nameDest','value.oldbalanceDest','value.newbalanceDest','value.isFraud','value.isFlaggedFraud')
 
-# oldDF = spark.read.schema(schema).csv("C:/Users/mrupv/bits/spa/Assignment2/project/data/")
-#
-# unionDF = oldDF.union(rowDF).dropDuplicates()
+prediction = model.transform(rowDF)
+result = prediction.select("features", "label", "myProbability", "prediction")
 
-query = rowDF.writeStream\
-    .outputMode("append")\
-    .format("csv")\
-    .option("path","C:/Users/mrupv/bits/spa/Assignment2/project/data/")\
-    .option("checkpointLocation", "C:/Users/mrupv/bits/spa/Assignment2/project/checkpoint_path/")\
-    .start()
-query.awaitTermination()
+fraud_records = result.where(result['prdeiction'] == 1)
+good_records = result.where(result['prdeiction'] != 1)
